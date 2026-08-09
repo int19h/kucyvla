@@ -1,6 +1,6 @@
 import { createSeededRandom } from "./crossword.js";
 
-export const DEFINITION_GENERATOR_VERSION = 1;
+export const DEFINITION_GENERATOR_VERSION = 4;
 export const DEFINITION_TYPE_ORDER = Object.freeze([
   "gismu",
   "lujvo",
@@ -8,16 +8,17 @@ export const DEFINITION_TYPE_ORDER = Object.freeze([
   "fuivla",
 ]);
 export const DEFAULT_DEFINITION_OPTIONS = Object.freeze({
-  minVotes: 5,
+  minVotes: 3,
   types: Object.freeze(["gismu", "lujvo"]),
-  gridSize: 15,
-  targetWords: 17,
+  gridSize: 17,
+  targetWords: 31,
   minimumWords: 9,
-  attempts: 16,
+  attempts: 256,
   minimumLength: 3,
   maximumLength: 15,
-  minimumCandidatesPerLength: 24,
-  fillNodeLimit: 80_000,
+  minimumCandidatesPerLength: 30,
+  fillNodeLimit: 20_000,
+  generationTimeLimitMilliseconds: 10_000,
 });
 
 const DIRECTIONS = Object.freeze({
@@ -25,6 +26,58 @@ const DIRECTIONS = Object.freeze({
   down: Object.freeze({ dx: 0, dy: 1 }),
 });
 const ANSWER_PATTERN = /^[a-z']+$/;
+const MINIMUM_PAIR_SLOT_CROSSINGS = 1;
+const MAXIMUM_PAIR_SLOT_CROSSINGS = 4;
+const MINIMUM_FINAL_SLOT_CROSSINGS = 2;
+const CLOCK_CHECK_INTERVAL = 64;
+
+export class DefinitionGenerationTimeoutError extends Error {
+  constructor(timeLimitMilliseconds) {
+    super(
+      `Crossword generation reached its ${timeLimitMilliseconds} ms time limit. Try another seed, select more word types, or adjust the filters.`,
+    );
+    this.name = "DefinitionGenerationTimeoutError";
+  }
+}
+
+function currentTimeMilliseconds() {
+  return typeof performance === "undefined" ? Date.now() : performance.now();
+}
+
+function createGenerationBudget(timeLimitMilliseconds) {
+  const deadline = currentTimeMilliseconds() + timeLimitMilliseconds;
+  let checkpointsUntilClockRead = 0;
+  return {
+    checkpoint(forceClockRead = false) {
+      if (!forceClockRead && checkpointsUntilClockRead > 0) {
+        checkpointsUntilClockRead -= 1;
+        return;
+      }
+      checkpointsUntilClockRead = CLOCK_CHECK_INTERVAL;
+      if (currentTimeMilliseconds() >= deadline) {
+        throw new DefinitionGenerationTimeoutError(timeLimitMilliseconds);
+      }
+    },
+  };
+}
+
+function scorePairCandidate({
+  addedCrossings,
+  areaGrowth,
+  imbalance,
+  lengthUsage,
+  lengthAvailability,
+  randomValue,
+}) {
+  return (
+    addedCrossings * 100
+    - areaGrowth * 3.2
+    - imbalance * 3
+    - lengthUsage * 18
+    + Math.log2(lengthAvailability + 1) * 4
+    + randomValue * 28
+  );
+}
 
 function coordinateKey(column, row) {
   return `${column},${row}`;
@@ -34,9 +87,10 @@ function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-function shuffled(values, random) {
+function shuffled(values, random, budget) {
   const result = [...values];
   for (let index = result.length - 1; index > 0; index -= 1) {
+    budget.checkpoint();
     const other = Math.floor(random() * (index + 1));
     [result[index], result[other]] = [result[other], result[index]];
   }
@@ -68,7 +122,14 @@ function normalizedOptions(overrides) {
   if (options.targetWords % 2 !== 1 || options.minimumWords % 2 !== 1) {
     throw new Error("Symmetric interlock word counts must be odd.");
   }
-  return { ...options, minVotes, types };
+  const generationTimeLimitMilliseconds = Number(options.generationTimeLimitMilliseconds);
+  if (
+    !Number.isFinite(generationTimeLimitMilliseconds)
+    || generationTimeLimitMilliseconds < 0
+  ) {
+    throw new Error("Generation time limit must be a non-negative number of milliseconds.");
+  }
+  return { ...options, minVotes, types, generationTimeLimitMilliseconds };
 }
 
 function eligibleEntries(dictionaryEntries, options) {
@@ -144,6 +205,12 @@ function slotCells(slot) {
     row: slot.row + dy * index,
     index,
   }));
+}
+
+function countSlotCrossings(board, slot) {
+  return slotCells(slot).filter((position) => (
+    board.cells.get(coordinateKey(position.column, position.row))?.slotIds.length === 2
+  )).length;
 }
 
 function inspectSlot(board, slot, requireCrossing = true) {
@@ -310,6 +377,8 @@ function pairCandidates(
   lengthUsage,
   countsByLength,
   charactersByLength,
+  maximumCrossings,
+  budget,
   random,
 ) {
   const candidates = [];
@@ -317,6 +386,7 @@ function pairCandidates(
   const currentArea = boardBounds(board).area;
 
   for (const cell of board.cells.values()) {
+    budget.checkpoint();
     if (cell.directions.size !== 1) {
       continue;
     }
@@ -326,6 +396,7 @@ function pairCandidates(
 
     for (const length of lengths) {
       for (let crossingIndex = 0; crossingIndex < length; crossingIndex += 1) {
+        budget.checkpoint();
         const first = {
           length,
           direction,
@@ -345,20 +416,22 @@ function pairCandidates(
         }
         seen.add(canonicalPair);
 
-        const firstInspection = inspectSlot(board, first);
+        const firstInspection = inspectSlot(board, first, false);
         if (
           !firstInspection
-          || firstInspection.crossings !== 1
+          || firstInspection.crossings < MINIMUM_PAIR_SLOT_CROSSINGS
+          || firstInspection.crossings > maximumCrossings
           || !crossingHasCharacterSupport(board, first, charactersByLength)
         ) {
           continue;
         }
         const trial = clonePatternBoard(board);
         placeSlot(trial, first);
-        const partnerInspection = inspectSlot(trial, partner);
+        const partnerInspection = inspectSlot(trial, partner, false);
         if (
           !partnerInspection
-          || partnerInspection.crossings !== 1
+          || partnerInspection.crossings < MINIMUM_PAIR_SLOT_CROSSINGS
+          || partnerInspection.crossings > maximumCrossings
           || !crossingHasCharacterSupport(trial, partner, charactersByLength)
         ) {
           continue;
@@ -368,13 +441,14 @@ function pairCandidates(
         const areaGrowth = bounds.area - currentArea;
         const availability = countsByLength.get(length) ?? 0;
         const usage = lengthUsage.get(length) ?? 0;
-        const score = (
-          -areaGrowth * 3.2
-          - Math.abs(bounds.width - bounds.height) * 3
-          - usage * 18
-          + Math.log2(availability + 1) * 4
-          + random() * 28
-        );
+        const score = scorePairCandidate({
+          addedCrossings: firstInspection.crossings + partnerInspection.crossings,
+          areaGrowth,
+          imbalance: Math.abs(bounds.width - bounds.height),
+          lengthUsage: usage,
+          lengthAvailability: availability,
+          randomValue: random(),
+        });
         candidates.push({ first, partner, trial, score });
       }
     }
@@ -397,7 +471,14 @@ function chooseCentralLength(lengths, countsByLength, random) {
   return oddLengths[Math.floor(random() * random() * choiceRange)];
 }
 
-function generatePattern(entriesByLength, seed, attemptIndex, options) {
+function generatePattern(
+  entriesByLength,
+  seed,
+  attemptIndex,
+  maximumCrossings,
+  budget,
+  options,
+) {
   const random = createSeededRandom(
     `definition:${DEFINITION_GENERATOR_VERSION}:${seed}:pattern:${attemptIndex}`,
   );
@@ -413,6 +494,7 @@ function generatePattern(entriesByLength, seed, attemptIndex, options) {
     [...entriesByLength].map(([length, entries]) => [length, entries.length]),
   );
   const charactersByLength = positionCharactersByLength(entriesByLength);
+  budget.checkpoint(true);
   const centralLength = chooseCentralLength(viableLengths, countsByLength, random);
   if (!centralLength) {
     return null;
@@ -439,6 +521,8 @@ function generatePattern(entriesByLength, seed, attemptIndex, options) {
       lengthUsage,
       countsByLength,
       charactersByLength,
+      maximumCrossings,
+      budget,
       random,
     );
     if (candidates.length === 0) {
@@ -453,7 +537,12 @@ function generatePattern(entriesByLength, seed, attemptIndex, options) {
     );
   }
 
-  if (board.slots.length < options.minimumWords) {
+  if (
+    board.slots.length < options.minimumWords
+    || board.slots.some(
+      (slot) => countSlotCrossings(board, slot) < MINIMUM_FINAL_SLOT_CROSSINGS,
+    )
+  ) {
     return null;
   }
   return board;
@@ -513,14 +602,14 @@ function crossingConstraints(pattern) {
   return { constraints, slotById };
 }
 
-function fillPattern(pattern, entriesByLength, seed, attemptIndex, options) {
+function fillPattern(pattern, entriesByLength, seed, attemptIndex, budget, options) {
   const random = createSeededRandom(
     `definition:${DEFINITION_GENERATOR_VERSION}:${seed}:fill:${attemptIndex}`,
   );
   const { constraints } = crossingConstraints(pattern);
   const initialDomains = new Map(pattern.slots.map((slot) => [
     slot.id,
-    shuffled(entriesByLength.get(slot.length) ?? [], random),
+    shuffled(entriesByLength.get(slot.length) ?? [], random, budget),
   ]));
   let visitedNodes = 0;
 
@@ -533,13 +622,20 @@ function fillPattern(pattern, entriesByLength, seed, attemptIndex, options) {
   function propagate(domains) {
     const queue = allArcs();
     while (queue.length > 0) {
+      budget.checkpoint();
       const { fromId, constraint } = queue.shift();
       const fromDomain = domains.get(fromId);
       const otherDomain = domains.get(constraint.otherId);
-      const revised = fromDomain.filter((entry) => otherDomain.some((other) => (
-        entry.word !== other.word
-        && entry.word[constraint.ownIndex] === other.word[constraint.otherIndex]
-      )));
+      const revised = [];
+      for (const entry of fromDomain) {
+        budget.checkpoint();
+        if (otherDomain.some((other) => (
+          entry.word !== other.word
+          && entry.word[constraint.ownIndex] === other.word[constraint.otherIndex]
+        ))) {
+          revised.push(entry);
+        }
+      }
       if (revised.length === 0) {
         return false;
       }
@@ -561,6 +657,7 @@ function fillPattern(pattern, entriesByLength, seed, attemptIndex, options) {
   }
 
   function search(domains) {
+    budget.checkpoint(true);
     visitedNodes += 1;
     if (visitedNodes > options.fillNodeLimit) {
       return null;
@@ -571,6 +668,7 @@ function fillPattern(pattern, entriesByLength, seed, attemptIndex, options) {
 
     let selectedSlot = null;
     for (const slot of pattern.slots) {
+      budget.checkpoint();
       const domain = domains.get(slot.id);
       if (domain.length === 1) {
         continue;
@@ -595,16 +693,24 @@ function fillPattern(pattern, entriesByLength, seed, attemptIndex, options) {
     }
 
     for (const entry of domains.get(selectedSlot.id)) {
+      budget.checkpoint();
       const nextDomains = new Map(
         [...domains].map(([slotId, domain]) => [slotId, [...domain]]),
       );
       nextDomains.set(selectedSlot.id, [entry]);
       let duplicateEmptiedDomain = false;
       for (const [slotId, domain] of nextDomains) {
+        budget.checkpoint();
         if (slotId === selectedSlot.id) {
           continue;
         }
-        const withoutDuplicate = domain.filter((candidate) => candidate.word !== entry.word);
+        const withoutDuplicate = [];
+        for (const candidate of domain) {
+          budget.checkpoint();
+          if (candidate.word !== entry.word) {
+            withoutDuplicate.push(candidate);
+          }
+        }
         if (withoutDuplicate.length === 0) {
           duplicateEmptiedDomain = true;
           break;
@@ -715,8 +821,11 @@ export function generateDefinitionCrossword(dictionaryEntries, seed, overrides =
     throw new TypeError("A non-empty string seed is required.");
   }
   const options = normalizedOptions(overrides);
+  const budget = createGenerationBudget(options.generationTimeLimitMilliseconds);
+  budget.checkpoint(true);
   const eligible = eligibleEntries(dictionaryEntries, options);
   const entriesByLength = groupByLength(eligible);
+  budget.checkpoint(true);
   const viableLengths = [...entriesByLength]
     .filter(([, entries]) => entries.length >= options.minimumCandidatesPerLength);
   if (eligible.length < options.minimumWords || viableLengths.length === 0) {
@@ -735,22 +844,39 @@ export function generateDefinitionCrossword(dictionaryEntries, seed, overrides =
       targetWords,
       minimumWords: targetWords,
     };
-    for (let attemptIndex = 0; attemptIndex < options.attempts; attemptIndex += 1) {
-      const attemptKey = `${targetWords}-${attemptIndex}`;
-      const rawPattern = generatePattern(entriesByLength, seed, attemptKey, targetOptions);
-      if (!rawPattern) {
-        continue;
-      }
-      const pattern = normalizePattern(rawPattern);
-      const assignments = fillPattern(
-        pattern,
-        entriesByLength,
-        seed,
-        attemptKey,
-        targetOptions,
-      );
-      if (assignments) {
-        return finalizePuzzle(pattern, assignments, seed, options);
+    // Prefer the densest permitted patterns, but retain a fillable fallback for
+    // narrower dictionary configurations.
+    for (
+      let maximumCrossings = MAXIMUM_PAIR_SLOT_CROSSINGS;
+      maximumCrossings >= MINIMUM_PAIR_SLOT_CROSSINGS;
+      maximumCrossings -= 1
+    ) {
+      for (let attemptIndex = 0; attemptIndex < options.attempts; attemptIndex += 1) {
+        budget.checkpoint(true);
+        const attemptKey = `${targetWords}-${maximumCrossings}-${attemptIndex}`;
+        const rawPattern = generatePattern(
+          entriesByLength,
+          seed,
+          attemptKey,
+          maximumCrossings,
+          budget,
+          targetOptions,
+        );
+        if (!rawPattern) {
+          continue;
+        }
+        const pattern = normalizePattern(rawPattern);
+        const assignments = fillPattern(
+          pattern,
+          entriesByLength,
+          seed,
+          attemptKey,
+          budget,
+          targetOptions,
+        );
+        if (assignments) {
+          return finalizePuzzle(pattern, assignments, seed, options);
+        }
       }
     }
   }
@@ -814,8 +940,13 @@ export function validateDefinitionPuzzle(puzzle) {
         throw new Error(`Entry ${entry.answer} does not match its cells.`);
       }
     }
-    if (!entry.cellKeys.some((key) => cellMap.get(key).entryIds.length === 2)) {
-      throw new Error(`Entry ${entry.answer} is disconnected.`);
+    const crossingCount = entry.cellKeys.filter(
+      (key) => cellMap.get(key).entryIds.length === 2,
+    ).length;
+    if (crossingCount < MINIMUM_FINAL_SLOT_CROSSINGS) {
+      throw new Error(
+        `Entry ${entry.answer} has ${crossingCount} crossings; at least ${MINIMUM_FINAL_SLOT_CROSSINGS} are required.`,
+      );
     }
     expectedRuns.add(`${entry.direction}:${entry.cellKeys.join("|")}`);
   }

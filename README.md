@@ -51,8 +51,12 @@ serve the files as-is.
   puzzles with the same seed but different options retain independent state.
 - White-square patterns have 180-degree rotational symmetry. Parallel entries
   cannot touch: entries either cross or have black-square separation.
+- Every entry has at least two crossings in the completed grid.
 - The geometry is generated first. A constraint solver then fills the slots
   with distinct eligible dictionary words.
+- Generation has a configurable wall-clock budget, currently ten seconds by
+  default. If a seed and filter combination exceeds it, the page reports a
+  timeout instead of continuing to block the browser indefinitely.
 
 ## Dictionary export
 

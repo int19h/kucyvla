@@ -12,49 +12,50 @@
     <link rel="stylesheet" href="styles.css">
   </head>
   <body class="definition-page">
-    <header class="masthead">
-      <div class="masthead__title">
-        <p class="eyebrow">Dictionary definitions</p>
-        <h1>crossword</h1>
-        <p class="dek">
-          Fill a symmetric Lojban crossword from its dictionary definitions.
-        </p>
-        <nav class="page-switch" aria-label="Crossword variety">
-          <a href="rafsi.html">Rafsi clues</a>
-          <a href="index.html" aria-current="page">Definition clues</a>
-        </nav>
-      </div>
-
-      <div class="puzzle-picker" aria-label="Puzzle controls">
-        <label for="definition-saved-puzzles">Saved puzzles</label>
-        <div class="puzzle-picker__row">
-          <select id="definition-saved-puzzles" aria-label="Open a saved puzzle">
-            <option>Loading saved puzzles…</option>
-          </select>
-          <button id="definition-new-puzzle" class="button button--primary" type="button">
-            New puzzle
-          </button>
-        </div>
-      </div>
+    <header class="masthead masthead--compact">
+      <h1 class="visually-hidden">Definition-clue Lojban crossword</h1>
+      <nav class="page-switch" aria-label="Crossword variety">
+        <a href="rafsi.html">Rafsi clues</a>
+        <a href="index.html" aria-current="page">Definition clues</a>
+      </nav>
     </header>
 
     <main>
-      <form id="definition-options" class="options-panel">
-        <div class="vote-option">
-          <label for="min-votes">Minimum votes</label>
-          <input id="min-votes" name="minVotes" type="number" min="0" step="1" value="5">
-        </div>
+      <div class="definition-controls">
+        <form id="definition-options" class="options-form">
+          <fieldset class="control-group">
+            <legend>Options</legend>
+            <div class="options-panel">
+              <div class="vote-option">
+                <label for="min-votes">Minimum votes</label>
+                <input id="min-votes" name="minVotes" type="number" min="0" step="1" value="5">
+              </div>
 
-        <fieldset class="type-options">
-          <legend>Word types</legend>
-          <label><input type="checkbox" name="wordType" value="gismu"> gismu</label>
-          <label><input type="checkbox" name="wordType" value="lujvo"> lujvo</label>
-          <label><input type="checkbox" name="wordType" value="cmevla"> cmevla</label>
-          <label><input type="checkbox" name="wordType" value="fuivla"> fu'ivla</label>
+              <fieldset class="type-options">
+                <legend>Word types</legend>
+                <label><input type="checkbox" name="wordType" value="gismu"> gismu</label>
+                <label><input type="checkbox" name="wordType" value="lujvo"> lujvo</label>
+                <label><input type="checkbox" name="wordType" value="cmevla"> cmevla</label>
+                <label><input type="checkbox" name="wordType" value="fuivla"> fu'ivla</label>
+              </fieldset>
+
+              <button class="button" type="submit">Apply options</button>
+            </div>
+          </fieldset>
+        </form>
+
+        <fieldset class="control-group puzzle-picker">
+          <legend>Saved puzzles</legend>
+          <div class="puzzle-picker__row">
+            <select id="definition-saved-puzzles" aria-label="Open a saved puzzle">
+              <option>Loading saved puzzles…</option>
+            </select>
+            <button id="definition-new-puzzle" class="button button--primary" type="button">
+              New puzzle
+            </button>
+          </div>
         </fieldset>
-
-        <button class="button" type="submit">Apply options</button>
-      </form>
+      </div>
 
       <section id="definition-puzzle" class="puzzle" aria-busy="true">
         <div class="puzzle__meta">
