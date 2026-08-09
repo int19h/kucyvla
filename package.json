@@ -1,0 +1,10 @@
+{
+  "name": "selrafsi-crossword",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "export-dictionary": "node scripts/export-dictionary.mjs",
+    "export-definitions": "node scripts/export-definitions.mjs",
+    "test": "node --test"
+  }
+}

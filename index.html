@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <meta
+      name="description"
+      content="A seeded Lojban crossword with dictionary definitions as clues."
+    >
+    <title>Lojban crossword — definition clues</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body class="definition-page">
+    <header class="masthead">
+      <div class="masthead__title">
+        <p class="eyebrow">Dictionary definitions</p>
+        <h1>crossword</h1>
+        <p class="dek">
+          Fill a symmetric Lojban crossword from its dictionary definitions.
+        </p>
+        <nav class="page-switch" aria-label="Crossword variety">
+          <a href="rafsi.html">Rafsi clues</a>
+          <a href="index.html" aria-current="page">Definition clues</a>
+        </nav>
+      </div>
+
+      <div class="puzzle-picker" aria-label="Puzzle controls">
+        <label for="definition-saved-puzzles">Saved puzzles</label>
+        <div class="puzzle-picker__row">
+          <select id="definition-saved-puzzles" aria-label="Open a saved puzzle">
+            <option>Loading saved puzzles…</option>
+          </select>
+          <button id="definition-new-puzzle" class="button button--primary" type="button">
+            New puzzle
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <form id="definition-options" class="options-panel">
+        <div class="vote-option">
+          <label for="min-votes">Minimum votes</label>
+          <input id="min-votes" name="minVotes" type="number" min="0" step="1" value="5">
+        </div>
+
+        <fieldset class="type-options">
+          <legend>Word types</legend>
+          <label><input type="checkbox" name="wordType" value="gismu"> gismu</label>
+          <label><input type="checkbox" name="wordType" value="lujvo"> lujvo</label>
+          <label><input type="checkbox" name="wordType" value="cmevla"> cmevla</label>
+          <label><input type="checkbox" name="wordType" value="fuivla"> fu'ivla</label>
+        </fieldset>
+
+        <button class="button" type="submit">Apply options</button>
+      </form>
+
+      <section id="definition-puzzle" class="puzzle" aria-busy="true">
+        <div class="puzzle__meta">
+          <div>
+            <p class="meta-label">Seed</p>
+            <p id="definition-seed" class="seed">—</p>
+          </div>
+          <div class="progress-block">
+            <p class="meta-label">Progress</p>
+            <p id="definition-progress" class="progress">Generating…</p>
+          </div>
+          <div class="puzzle__actions">
+            <button id="definition-check" class="button" type="button" disabled>
+              Check
+            </button>
+            <button id="definition-clear" class="button button--quiet" type="button" disabled>
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <p id="definition-status" class="status" aria-live="polite"></p>
+        <div id="definition-error" class="error" role="alert" hidden></div>
+
+        <div class="game-layout">
+          <section class="board-card" aria-labelledby="definition-board-title">
+            <h2 id="definition-board-title" class="visually-hidden">Crossword grid</h2>
+            <div class="board-scroll">
+              <div id="definition-grid" class="grid" aria-label="Crossword grid"></div>
+            </div>
+            <p class="grid-note">
+              Every letter, including the apostrophe, is entered normally.
+              Press Enter at a crossing to change direction.
+            </p>
+          </section>
+
+          <aside class="clues" aria-label="Crossword clues">
+            <section class="clue-group">
+              <div class="clue-group__heading">
+                <h2>Across</h2>
+                <span id="definition-across-count" aria-hidden="true"></span>
+              </div>
+              <ol id="definition-across-clues" class="clue-list"></ol>
+            </section>
+
+            <section class="clue-group">
+              <div class="clue-group__heading">
+                <h2>Down</h2>
+                <span id="definition-down-count" aria-hidden="true"></span>
+              </div>
+              <ol id="definition-down-clues" class="clue-list"></ol>
+            </section>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        Pattern generation and dictionary filling run entirely in your browser.
+        The black-square pattern has 180° rotational symmetry.
+      </p>
+    </footer>
+
+    <script type="module" src="definition-app.js"></script>
+  </body>
+</html>
