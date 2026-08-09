@@ -336,7 +336,7 @@ function generateAttempt(dictionaryEntries, seed, attemptIndex, options) {
     `selrafsi:${GENERATOR_VERSION}:${seed}:attempt:${attemptIndex}`,
   );
   const words = prepareWords(dictionaryEntries, random, options.gismuCandidates);
-  const first = words.find((word) => word.type === "gismu");
+  const first = words.find((word) => word.type === "gismu") ?? words[0];
   if (!first) {
     return null;
   }

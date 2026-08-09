@@ -1,8 +1,4 @@
-import {
-  DEFAULT_DEFINITION_OPTIONS,
-  DEFINITION_TYPE_ORDER,
-  generateDefinitionCrossword,
-} from "./definition-crossword.js";
+import { generateDefinitionCrossword } from "./definition-crossword.js";
 import {
   definitionConfigurationKey,
   readDefinitionProgress,
@@ -10,10 +6,13 @@ import {
   writeDefinitionProgress,
 } from "./definition-storage.js";
 import { formatDictionaryDefinition } from "./definition-format.js";
+import {
+  initializeOptionsToolbar,
+  readDefinitionConfiguration,
+} from "./options-toolbar.js";
 
 const elements = {
   puzzle: document.querySelector("#definition-puzzle"),
-  seed: document.querySelector("#definition-seed"),
   progress: document.querySelector("#definition-progress"),
   status: document.querySelector("#definition-status"),
   error: document.querySelector("#definition-error"),
@@ -22,78 +21,20 @@ const elements = {
   downClues: document.querySelector("#definition-down-clues"),
   acrossCount: document.querySelector("#definition-across-count"),
   downCount: document.querySelector("#definition-down-count"),
-  savedPuzzles: document.querySelector("#definition-saved-puzzles"),
-  newPuzzle: document.querySelector("#definition-new-puzzle"),
   checkPuzzle: document.querySelector("#definition-check"),
   clearPuzzle: document.querySelector("#definition-clear"),
-  options: document.querySelector("#definition-options"),
-  minVotes: document.querySelector("#min-votes"),
-  typeInputs: [...document.querySelectorAll('input[name="wordType"]')],
 };
-
-const TYPE_LABELS = Object.freeze({
-  gismu: "gismu",
-  lujvo: "lujvo",
-  cmevla: "cmevla",
-  fuivla: "fu'ivla",
-});
 
 let configuration = null;
 let puzzle = null;
+let optionsToolbar = null;
 let cellByKey = new Map();
 let entryById = new Map();
 let cellElementByKey = new Map();
 let inputByKey = new Map();
 let clueButtonByEntryId = new Map();
-let savedStateByKey = new Map();
 let activeCellKey = null;
 let activeDirection = "across";
-
-function randomSeed() {
-  const parts = new Uint32Array(3);
-  crypto.getRandomValues(parts);
-  return [...parts]
-    .map((part) => part.toString(36).padStart(7, "0"))
-    .join("-");
-}
-
-function normalizedTypes(rawTypes) {
-  return DEFINITION_TYPE_ORDER.filter((type) => rawTypes.includes(type));
-}
-
-function configurationUrl(nextConfiguration) {
-  const url = new URL(window.location.href);
-  url.search = "";
-  url.searchParams.set("seed", nextConfiguration.seed);
-  url.searchParams.set("minVotes", String(nextConfiguration.minVotes));
-  url.searchParams.set("types", nextConfiguration.types.join(","));
-  return url;
-}
-
-function readConfiguration() {
-  const url = new URL(window.location.href);
-  const seed = url.searchParams.get("seed") || randomSeed();
-  const rawMinVotes = url.searchParams.get("minVotes");
-  const parsedMinVotes = rawMinVotes === null ? NaN : Number(rawMinVotes);
-  const minVotes = Number.isInteger(parsedMinVotes) && parsedMinVotes >= 0
-    ? parsedMinVotes
-    : DEFAULT_DEFINITION_OPTIONS.minVotes;
-  const rawTypes = url.searchParams.get("types");
-  const requestedTypes = rawTypes === null
-    ? [...DEFAULT_DEFINITION_OPTIONS.types]
-    : rawTypes.split(",");
-  const types = normalizedTypes(requestedTypes);
-  const result = {
-    seed,
-    minVotes,
-    types: types.length > 0 ? types : [...DEFAULT_DEFINITION_OPTIONS.types],
-  };
-  const canonical = configurationUrl(result);
-  if (canonical.href !== url.href) {
-    window.history.replaceState(null, "", canonical);
-  }
-  return result;
-}
 
 function createElement(tagName, className, text) {
   const element = document.createElement(tagName);
@@ -124,48 +65,6 @@ function savedPuzzles() {
   return readDefinitionProgress(window.localStorage);
 }
 
-function truncatedSeed(seed) {
-  return seed.length <= 22 ? seed : `${seed.slice(0, 19)}…`;
-}
-
-function savedStateLabel(state) {
-  const typeSummary = state.types.map((type) => TYPE_LABELS[type]).join("+");
-  const count = Object.keys(state.values).length;
-  return `${truncatedSeed(state.seed)} · ${typeSummary} · ≥${state.minVotes} · ${count}`;
-}
-
-function populateSavedPuzzleSelect() {
-  const saved = savedPuzzles();
-  savedStateByKey = new Map(
-    saved.map((state) => [definitionConfigurationKey(state), state]),
-  );
-  elements.savedPuzzles.replaceChildren();
-  const placeholder = createElement(
-    "option",
-    "",
-    saved.length > 0 ? "Choose a saved puzzle…" : "No saved puzzles yet",
-  );
-  placeholder.value = "";
-  elements.savedPuzzles.append(placeholder);
-
-  for (const state of saved) {
-    const key = definitionConfigurationKey(state);
-    const option = createElement("option", "", savedStateLabel(state));
-    option.value = key;
-    elements.savedPuzzles.append(option);
-  }
-  elements.savedPuzzles.disabled = saved.length === 0;
-  const currentKey = definitionConfigurationKey(configuration);
-  elements.savedPuzzles.value = savedStateByKey.has(currentKey) ? currentKey : "";
-}
-
-function populateOptionForm() {
-  elements.minVotes.value = String(configuration.minVotes);
-  for (const input of elements.typeInputs) {
-    input.checked = configuration.types.includes(input.value);
-  }
-}
-
 function activeEntry() {
   const cell = cellByKey.get(activeCellKey);
   if (!cell) {
@@ -194,7 +93,20 @@ function paintActiveEntry() {
   cellElementByKey.get(activeCellKey)?.classList.add("cell--active");
   const clueButton = clueButtonByEntryId.get(entry.id);
   clueButton?.classList.add("clue-button--active");
-  clueButton?.scrollIntoView({ block: "nearest" });
+  revealClueButton(clueButton);
+}
+
+function revealClueButton(button) {
+  const list = button?.closest(".clue-list");
+  const item = button?.parentElement;
+  if (!list || !item) {
+    return;
+  }
+  if (item.offsetTop < list.scrollTop) {
+    list.scrollTop = item.offsetTop;
+  } else if (item.offsetTop + item.offsetHeight > list.scrollTop + list.clientHeight) {
+    list.scrollTop = item.offsetTop + item.offsetHeight - list.clientHeight;
+  }
 }
 
 function activateCell(key, requestedDirection = activeDirection, focus = true) {
@@ -301,7 +213,7 @@ function persistProgress() {
   if (!stored) {
     setStatus("Progress could not be saved in this browser.", "warning");
   }
-  populateSavedPuzzleSelect();
+  optionsToolbar.refreshSavedPuzzles();
 }
 
 function handleInput(event) {
@@ -479,42 +391,12 @@ function clearPuzzle() {
   }
   clearCheckMarks();
   removeDefinitionProgress(window.localStorage, configuration);
-  populateSavedPuzzleSelect();
+  optionsToolbar.refreshSavedPuzzles();
   updateProgress();
   activateEntry(puzzle.entries[0].id);
 }
 
 function installPageControls() {
-  elements.savedPuzzles.addEventListener("change", () => {
-    const state = savedStateByKey.get(elements.savedPuzzles.value);
-    if (state) {
-      window.location.assign(configurationUrl(state));
-    }
-  });
-  elements.newPuzzle.addEventListener("click", () => {
-    const knownSeeds = new Set(savedPuzzles().map((state) => state.seed));
-    let seed = randomSeed();
-    while (seed === configuration.seed || knownSeeds.has(seed)) {
-      seed = randomSeed();
-    }
-    window.location.assign(configurationUrl({ ...configuration, seed }));
-  });
-  elements.options.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const minVotes = Number(elements.minVotes.value);
-    const types = normalizedTypes(
-      elements.typeInputs.filter((input) => input.checked).map((input) => input.value),
-    );
-    if (!Number.isInteger(minVotes) || minVotes < 0) {
-      setStatus("Minimum votes must be a non-negative integer.", "warning");
-      return;
-    }
-    if (types.length === 0) {
-      setStatus("Select at least one word type.", "warning");
-      return;
-    }
-    window.location.assign(configurationUrl({ ...configuration, minVotes, types }));
-  });
   elements.checkPuzzle.addEventListener("click", checkPuzzle);
   elements.clearPuzzle.addEventListener("click", clearPuzzle);
 }
@@ -532,10 +414,12 @@ async function loadDictionary() {
 }
 
 async function main() {
-  configuration = readConfiguration();
-  elements.seed.textContent = configuration.seed;
-  populateOptionForm();
-  populateSavedPuzzleSelect();
+  configuration = readDefinitionConfiguration();
+  optionsToolbar = initializeOptionsToolbar({
+    currentClueType: "definition",
+    configuration,
+    setStatus,
+  });
   installPageControls();
 
   try {
@@ -551,7 +435,7 @@ async function main() {
     renderClues();
     restoreProgress();
     updateProgress();
-    populateSavedPuzzleSelect();
+    optionsToolbar.refreshSavedPuzzles();
     elements.checkPuzzle.disabled = false;
     elements.puzzle.setAttribute("aria-busy", "false");
     activateEntry(puzzle.entries[0].id);

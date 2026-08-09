@@ -61,3 +61,23 @@ test("apostrophes can be used as ordinary crossing letters", () => {
   );
   assert.ok(crossing, "the two answers should cross on their apostrophe");
 });
+
+test("cmavo-only dictionaries can seed a crossword", () => {
+  const cmavo = dictionary.entries.filter((entry) => entry.type === "cmavo");
+  const puzzle = generateCrossword(cmavo, "cmavo-only", {
+    minimumCmavo: 0,
+    maximumCmavo: Infinity,
+  });
+  assert.ok(puzzle.entries.length >= 14);
+  assert.ok(puzzle.entries.every((entry) => entry.type === "cmavo"));
+});
+
+test("gismu-only dictionaries support the default rafsi filter", () => {
+  const gismu = dictionary.entries.filter((entry) => entry.type === "gismu");
+  const puzzle = generateCrossword(gismu, "gismu-only", {
+    minimumCmavo: 0,
+    maximumCmavo: 0,
+  });
+  assert.ok(puzzle.entries.length >= 14);
+  assert.ok(puzzle.entries.every((entry) => entry.type === "gismu"));
+});

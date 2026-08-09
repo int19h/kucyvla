@@ -1,6 +1,13 @@
 export const STORAGE_KEY = "selrafsi:puzzle-progress:v1";
+export const RAFSI_TYPE_ORDER = Object.freeze(["gismu", "cmavo"]);
+export const DEFAULT_RAFSI_TYPES = Object.freeze(["gismu"]);
 const STORAGE_VERSION = 1;
 const LETTER_PATTERN = /^[a-z']$/;
+const LEGACY_RAFSI_TYPES = Object.freeze(["gismu", "cmavo"]);
+
+function normalizedTypes(types) {
+  return RAFSI_TYPE_ORDER.filter((type) => types?.includes(type));
+}
 
 function normalizedValues(values) {
   if (!values || typeof values !== "object" || Array.isArray(values)) {
@@ -12,10 +19,12 @@ function normalizedValues(values) {
 }
 
 function normalizedPuzzle(value) {
+  const types = normalizedTypes(value?.types ?? LEGACY_RAFSI_TYPES);
   if (
     !value
     || typeof value.seed !== "string"
     || typeof value.signature !== "string"
+    || types.length === 0
   ) {
     return null;
   }
@@ -25,10 +34,15 @@ function normalizedPuzzle(value) {
   }
   return {
     seed: value.seed,
+    types,
     signature: value.signature,
     values,
     updatedAt: Number.isFinite(value.updatedAt) ? value.updatedAt : 0,
   };
+}
+
+export function rafsiConfigurationKey({ seed, types }) {
+  return JSON.stringify([seed, normalizedTypes(types)]);
 }
 
 export function readSavedPuzzles(storage = globalThis.localStorage) {
@@ -51,12 +65,21 @@ export function readSavedPuzzles(storage = globalThis.localStorage) {
 
 export function writePuzzleProgress(
   storage,
-  { seed, signature, values, updatedAt = Date.now() },
+  { seed, types, signature, values, updatedAt = Date.now() },
 ) {
+  const configuration = { seed, types: normalizedTypes(types) };
+  const key = rafsiConfigurationKey(configuration);
   const cleanedValues = normalizedValues(values);
-  const puzzles = readSavedPuzzles(storage).filter((puzzle) => puzzle.seed !== seed);
+  const puzzles = readSavedPuzzles(storage).filter(
+    (puzzle) => rafsiConfigurationKey(puzzle) !== key,
+  );
   if (Object.keys(cleanedValues).length > 0) {
-    puzzles.push({ seed, signature, values: cleanedValues, updatedAt });
+    puzzles.push({
+      ...configuration,
+      signature,
+      values: cleanedValues,
+      updatedAt,
+    });
   }
   puzzles.sort((left, right) => right.updatedAt - left.updatedAt);
 
@@ -71,9 +94,9 @@ export function writePuzzleProgress(
   }
 }
 
-export function removePuzzleProgress(storage, seed) {
+export function removePuzzleProgress(storage, configuration) {
   return writePuzzleProgress(storage, {
-    seed,
+    ...configuration,
     signature: "",
     values: {},
   });

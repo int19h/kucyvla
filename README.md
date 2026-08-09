@@ -28,12 +28,15 @@ serve the files as-is.
 
 ## Behavior
 
-- `?seed=...` selects a puzzle. Without it, the browser creates a random seed
-  and updates the URL before generating the puzzle.
-- The same seed and bundled dictionary produce the same layout, fill, and clue
-  choices.
-- Entered letters are stored locally per seed. The saved-puzzle menu lists only
-  seeds for which at least one letter has been entered.
+- The toolbar switches between rafsi and definition clues, accepts an editable
+  seed, and exposes the filters for the selected clue variety. `New seed` fills
+  the seed field; `Generate` applies the edited settings.
+- Without a seed in the URL, the browser creates one and updates the URL before
+  generating the puzzle. The same seed, filters, and bundled dictionary produce
+  the same layout, fill, and clue choices.
+- Entered letters are stored locally per complete puzzle configuration. The
+  Load menu combines saved rafsi and definition puzzles for which at least one
+  letter has been entered.
 - Apostrophes are ordinary editable grid letters and may be used as crossings.
 - Empty positions inside the puzzle's bounding rectangle are drawn as black
   squares. The black-square pattern is not required to be symmetrical.
@@ -42,7 +45,7 @@ serve the files as-is.
 
 - The URL records the seed, inclusive minimum vote count, and selected types:
   `?seed=example&minVotes=5&types=gismu,lujvo`.
-- The default threshold is 5 votes. Gismu and lujvo are enabled by default;
+- The default threshold is 3 votes. Gismu and lujvo are enabled by default;
   cmevla and fu'ivla are available but disabled by default.
 - The gismu category includes experimental gismu. The lujvo category contains
   ordinary single-word lujvo. Compound cmavo and other multiword categories are
@@ -57,6 +60,15 @@ serve the files as-is.
 - Generation has a configurable wall-clock budget, currently ten seconds by
   default. If a seed and filter combination exceeds it, the page reports a
   timeout instead of continuing to block the browser indefinitely.
+
+### Rafsi crossword
+
+- The URL records the seed and selected answer types:
+  `?seed=example&types=gismu`.
+- Gismu are enabled by default. Cmavo are available but disabled by default.
+- Saved progress is keyed by both the seed and selected types. Saved puzzles
+  made before the type filter was added retain the former gismu-and-cmavo
+  configuration.
 
 ## Dictionary export
 

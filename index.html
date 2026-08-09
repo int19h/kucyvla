@@ -12,57 +12,90 @@
     <link rel="stylesheet" href="styles.css">
   </head>
   <body class="definition-page">
-    <header class="masthead masthead--compact">
-      <h1 class="visually-hidden">Definition-clue Lojban crossword</h1>
-      <nav class="page-switch" aria-label="Crossword variety">
-        <a href="rafsi.html">Rafsi clues</a>
-        <a href="index.html" aria-current="page">Definition clues</a>
-      </nav>
-    </header>
-
     <main>
-      <div class="definition-controls">
-        <form id="definition-options" class="options-form">
-          <fieldset class="control-group">
-            <legend>Options</legend>
-            <div class="options-panel">
-              <div class="vote-option">
-                <label for="min-votes">Minimum votes</label>
-                <input id="min-votes" name="minVotes" type="number" min="0" step="1" value="5">
-              </div>
+      <h1 class="visually-hidden">Definition-clue Lojban crossword</h1>
 
-              <fieldset class="type-options">
-                <legend>Word types</legend>
-                <label><input type="checkbox" name="wordType" value="gismu"> gismu</label>
-                <label><input type="checkbox" name="wordType" value="lujvo"> lujvo</label>
-                <label><input type="checkbox" name="wordType" value="cmevla"> cmevla</label>
-                <label><input type="checkbox" name="wordType" value="fuivla"> fu'ivla</label>
-              </fieldset>
-
-              <button class="button" type="submit">Apply options</button>
+      <form id="options-toolbar" class="options-toolbar" novalidate>
+        <section class="option-panel option-panel--puzzle" aria-labelledby="puzzle-options-title">
+          <h2 id="puzzle-options-title" class="option-panel__title">Options</h2>
+          <div class="option-panel__content">
+            <div class="toolbar-field">
+              <label class="toolbar-label" for="clue-type">Clues</label>
+              <select id="clue-type" name="clueType">
+                <option value="rafsi">Rafsi</option>
+                <option value="definition">Definitions</option>
+              </select>
             </div>
-          </fieldset>
-        </form>
 
-        <fieldset class="control-group puzzle-picker">
-          <legend>Saved puzzles</legend>
-          <div class="puzzle-picker__row">
-            <select id="definition-saved-puzzles" aria-label="Open a saved puzzle">
-              <option>Loading saved puzzles…</option>
-            </select>
-            <button id="definition-new-puzzle" class="button button--primary" type="button">
-              New puzzle
-            </button>
+            <div class="toolbar-field toolbar-field--seed">
+              <label class="toolbar-label" for="seed-input">Seed</label>
+              <div class="attached-controls">
+                <input id="seed-input" name="seed" type="text" spellcheck="false">
+                <button id="new-seed" class="button" type="button">New seed</button>
+              </div>
+            </div>
           </div>
-        </fieldset>
-      </div>
+        </section>
+
+        <section class="option-panel option-panel--words" aria-labelledby="word-selection-title">
+          <h2 id="word-selection-title" class="option-panel__title">Word selection</h2>
+          <div id="definition-word-selection" class="word-selection">
+            <div class="toolbar-field toolbar-field--votes">
+              <label class="toolbar-label" for="min-votes">Min votes</label>
+              <input id="min-votes" name="minVotes" type="number" min="0" step="1" value="5">
+            </div>
+
+            <div class="toolbar-field">
+              <span id="definition-types-label" class="toolbar-label">Word types</span>
+              <div class="type-options" role="group" aria-labelledby="definition-types-label">
+                <label><input type="checkbox" name="definitionWordType" value="gismu"> gismu</label>
+                <label><input type="checkbox" name="definitionWordType" value="lujvo"> lujvo</label>
+                <label><input type="checkbox" name="definitionWordType" value="cmevla"> cmevla</label>
+                <label><input type="checkbox" name="definitionWordType" value="fuivla"> fu'ivla</label>
+              </div>
+            </div>
+          </div>
+
+          <div id="rafsi-word-selection" class="word-selection" hidden>
+            <div class="toolbar-field">
+              <span id="rafsi-types-label" class="toolbar-label">Word types</span>
+              <div class="type-options" role="group" aria-labelledby="rafsi-types-label">
+                <label><input type="checkbox" name="rafsiWordType" value="gismu" checked> gismu</label>
+                <label><input type="checkbox" name="rafsiWordType" value="cmavo"> cmavo</label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="toolbar-actions">
+          <button class="button button--primary toolbar-generate" type="submit">Generate</button>
+          <div class="toolbar-load">
+            <div class="split-button">
+              <button
+                id="saved-load"
+                class="button split-button__main"
+                type="button"
+                aria-haspopup="menu"
+                aria-controls="saved-menu"
+                aria-expanded="false"
+              >Load</button>
+              <button
+                id="saved-toggle"
+                class="button split-button__toggle"
+                type="button"
+                aria-label="Choose a saved puzzle"
+                aria-haspopup="menu"
+                aria-controls="saved-menu"
+                aria-expanded="false"
+              ><span aria-hidden="true">▾</span></button>
+            </div>
+            <div id="saved-menu" class="saved-menu" role="menu" hidden></div>
+          </div>
+        </div>
+      </form>
 
       <section id="definition-puzzle" class="puzzle" aria-busy="true">
         <div class="puzzle__meta">
-          <div>
-            <p class="meta-label">Seed</p>
-            <p id="definition-seed" class="seed">—</p>
-          </div>
           <div class="progress-block">
             <p class="meta-label">Progress</p>
             <p id="definition-progress" class="progress">Generating…</p>
@@ -112,13 +145,6 @@
         </div>
       </section>
     </main>
-
-    <footer>
-      <p>
-        Pattern generation and dictionary filling run entirely in your browser.
-        The black-square pattern has 180° rotational symmetry.
-      </p>
-    </footer>
 
     <script type="module" src="definition-app.js"></script>
   </body>

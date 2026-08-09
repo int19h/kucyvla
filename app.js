@@ -1,5 +1,10 @@
 import { generateCrossword } from "./crossword.js";
 import {
+  initializeOptionsToolbar,
+  readRafsiConfiguration,
+} from "./options-toolbar.js";
+import {
+  rafsiConfigurationKey,
   readSavedPuzzles,
   removePuzzleProgress,
   writePuzzleProgress,
@@ -7,7 +12,6 @@ import {
 
 const elements = {
   puzzle: document.querySelector("#puzzle"),
-  seed: document.querySelector("#seed"),
   progress: document.querySelector("#progress"),
   status: document.querySelector("#status"),
   error: document.querySelector("#error"),
@@ -16,13 +20,13 @@ const elements = {
   downClues: document.querySelector("#down-clues"),
   acrossCount: document.querySelector("#across-count"),
   downCount: document.querySelector("#down-count"),
-  savedPuzzles: document.querySelector("#saved-puzzles"),
-  newPuzzle: document.querySelector("#new-puzzle"),
   checkPuzzle: document.querySelector("#check-puzzle"),
   clearPuzzle: document.querySelector("#clear-puzzle"),
 };
 
+let configuration = null;
 let puzzle = null;
+let optionsToolbar = null;
 let cellByKey = new Map();
 let entryById = new Map();
 let cellElementByKey = new Map();
@@ -30,31 +34,6 @@ let inputByKey = new Map();
 let clueButtonByEntryId = new Map();
 let activeCellKey = null;
 let activeDirection = "across";
-
-function seedUrl(seed) {
-  const url = new URL(window.location.href);
-  url.searchParams.set("seed", seed);
-  return url;
-}
-
-function randomSeed() {
-  const parts = new Uint32Array(3);
-  crypto.getRandomValues(parts);
-  return [...parts]
-    .map((part) => part.toString(36).padStart(7, "0"))
-    .join("-");
-}
-
-function currentSeed() {
-  const url = new URL(window.location.href);
-  const requested = url.searchParams.get("seed");
-  if (requested) {
-    return requested;
-  }
-  const generated = randomSeed();
-  window.history.replaceState(null, "", seedUrl(generated));
-  return generated;
-}
 
 function createElement(tagName, className, text) {
   const element = document.createElement(tagName);
@@ -83,35 +62,6 @@ function showError(error) {
 
 function savedPuzzles() {
   return readSavedPuzzles(window.localStorage);
-}
-
-function truncatedSeed(seed) {
-  return seed.length <= 28 ? seed : `${seed.slice(0, 25)}…`;
-}
-
-function populateSavedPuzzleSelect(seed) {
-  const saved = savedPuzzles();
-  elements.savedPuzzles.replaceChildren();
-
-  const placeholder = createElement("option", "", saved.length > 0
-    ? "Choose a saved puzzle…"
-    : "No saved puzzles yet");
-  placeholder.value = "";
-  elements.savedPuzzles.append(placeholder);
-
-  for (const state of saved) {
-    const count = Object.keys(state.values).length;
-    const option = createElement(
-      "option",
-      "",
-      `${truncatedSeed(state.seed)} · ${count} ${count === 1 ? "letter" : "letters"}`,
-    );
-    option.value = state.seed;
-    elements.savedPuzzles.append(option);
-  }
-
-  elements.savedPuzzles.disabled = saved.length === 0;
-  elements.savedPuzzles.value = saved.some((state) => state.seed === seed) ? seed : "";
 }
 
 function editableKeysForEntry(entry) {
@@ -150,7 +100,20 @@ function paintActiveEntry() {
   cellElementByKey.get(activeCellKey)?.classList.add("cell--active");
   const clueButton = clueButtonByEntryId.get(entry.id);
   clueButton?.classList.add("clue-button--active");
-  clueButton?.scrollIntoView({ block: "nearest" });
+  revealClueButton(clueButton);
+}
+
+function revealClueButton(button) {
+  const list = button?.closest(".clue-list");
+  const item = button?.parentElement;
+  if (!list || !item) {
+    return;
+  }
+  if (item.offsetTop < list.scrollTop) {
+    list.scrollTop = item.offsetTop;
+  } else if (item.offsetTop + item.offsetHeight > list.scrollTop + list.clientHeight) {
+    list.scrollTop = item.offsetTop + item.offsetHeight - list.clientHeight;
+  }
 }
 
 function focusNearestEditable(entry, preferredKey = null) {
@@ -268,13 +231,14 @@ function persistProgress() {
   const values = enteredValues();
   const stored = writePuzzleProgress(window.localStorage, {
     seed: puzzle.seed,
+    types: configuration.types,
     signature: puzzle.signature,
     values,
   });
   if (!stored) {
     setStatus("Progress could not be saved in this browser.", "warning");
   }
-  populateSavedPuzzleSelect(puzzle.seed);
+  optionsToolbar.refreshSavedPuzzles();
 }
 
 function handleInput(event, key) {
@@ -420,8 +384,12 @@ function renderClues() {
 }
 
 function restoreProgress() {
+  const key = rafsiConfigurationKey(configuration);
   const state = savedPuzzles().find(
-    (candidate) => candidate.seed === puzzle.seed && candidate.signature === puzzle.signature,
+    (candidate) => (
+      rafsiConfigurationKey(candidate) === key
+      && candidate.signature === puzzle.signature
+    ),
   );
   if (!state) {
     return;
@@ -468,27 +436,14 @@ function clearPuzzle() {
     input.value = "";
   }
   clearCheckMarks();
-  removePuzzleProgress(window.localStorage, puzzle.seed);
-  populateSavedPuzzleSelect(puzzle.seed);
+  removePuzzleProgress(window.localStorage, configuration);
+  optionsToolbar.refreshSavedPuzzles();
   updateProgress();
   const firstEntry = puzzle.entries[0];
   activateEntry(firstEntry.id);
 }
 
-function installPageControls(seed) {
-  elements.savedPuzzles.addEventListener("change", () => {
-    if (elements.savedPuzzles.value) {
-      window.location.assign(seedUrl(elements.savedPuzzles.value));
-    }
-  });
-  elements.newPuzzle.addEventListener("click", () => {
-    const knownSeeds = new Set(savedPuzzles().map((state) => state.seed));
-    let nextSeed = randomSeed();
-    while (nextSeed === seed || knownSeeds.has(nextSeed)) {
-      nextSeed = randomSeed();
-    }
-    window.location.assign(seedUrl(nextSeed));
-  });
+function installPageControls() {
   elements.checkPuzzle.addEventListener("click", checkPuzzle);
   elements.clearPuzzle.addEventListener("click", clearPuzzle);
 }
@@ -506,21 +461,33 @@ async function loadDictionary() {
 }
 
 async function main() {
-  const seed = currentSeed();
-  elements.seed.textContent = seed;
-  populateSavedPuzzleSelect(seed);
-  installPageControls(seed);
+  configuration = readRafsiConfiguration();
+  optionsToolbar = initializeOptionsToolbar({
+    currentClueType: "rafsi",
+    configuration,
+    setStatus,
+  });
+  installPageControls();
 
   try {
     const dictionaryEntries = await loadDictionary();
-    puzzle = generateCrossword(dictionaryEntries, seed);
+    const selectedTypes = new Set(configuration.types);
+    const eligibleEntries = dictionaryEntries.filter(
+      (entry) => selectedTypes.has(entry.type),
+    );
+    const includesGismu = selectedTypes.has("gismu");
+    const includesCmavo = selectedTypes.has("cmavo");
+    puzzle = generateCrossword(eligibleEntries, configuration.seed, {
+      minimumCmavo: includesGismu && includesCmavo ? 3 : 0,
+      maximumCmavo: includesCmavo ? (includesGismu ? 6 : Infinity) : 0,
+    });
     cellByKey = new Map(puzzle.cells.map((cell) => [cell.key, cell]));
     entryById = new Map(puzzle.entries.map((entry) => [entry.id, entry]));
     renderGrid();
     renderClues();
     restoreProgress();
     updateProgress();
-    populateSavedPuzzleSelect(seed);
+    optionsToolbar.refreshSavedPuzzles();
     elements.checkPuzzle.disabled = false;
     elements.puzzle.setAttribute("aria-busy", "false");
     activateEntry(puzzle.entries[0].id);

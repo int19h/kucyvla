@@ -44,21 +44,6 @@ select {
   color: inherit;
 }
 
-.masthead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 2rem;
-  width: min(92rem, calc(100% - 3rem));
-  margin: 0 auto;
-  padding: 3rem 0 1.5rem;
-  border-bottom: 1px solid var(--line);
-}
-
-.masthead--compact {
-  padding: 0.85rem 0;
-}
-
 .meta-label {
   margin: 0;
   color: var(--accent-dark);
@@ -68,53 +53,11 @@ select {
   text-transform: uppercase;
 }
 
-.page-switch {
-  display: flex;
-  gap: 0.35rem;
-  margin: 0;
-}
-
-.page-switch a {
-  padding: 0.4rem 0.7rem;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 750;
-  text-decoration: none;
-}
-
-.page-switch a:hover {
-  color: var(--ink);
-  border-color: var(--line);
-}
-
-.page-switch a[aria-current="page"] {
-  color: var(--accent-dark);
-  border-color: #e6b1a9;
-  background: #fff4f1;
-}
-
-.puzzle-picker {
-  min-width: min(100%, 24rem);
-}
-
-.puzzle-picker label {
-  display: block;
-  margin-bottom: 0.45rem;
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.puzzle-picker__row {
-  display: flex;
-  gap: 0.65rem;
-}
-
 select,
+.options-toolbar input[type="text"],
+.options-toolbar input[type="number"],
 .button {
-  min-height: 2.75rem;
+  min-height: 2.55rem;
   border: 1px solid var(--line);
   border-radius: 0.55rem;
   background: var(--surface);
@@ -122,8 +65,14 @@ select,
 
 select {
   min-width: 0;
-  flex: 1;
   padding: 0 2.2rem 0 0.8rem;
+}
+
+.options-toolbar input[type="text"],
+.options-toolbar input[type="number"] {
+  min-width: 0;
+  padding: 0 0.75rem;
+  color: var(--ink);
 }
 
 .button {
@@ -140,6 +89,7 @@ select {
 
 .button:focus-visible,
 select:focus-visible,
+.options-toolbar input:focus-visible,
 .cell input:focus-visible,
 .clue-button:focus-visible {
   outline: 3px solid rgb(217 79 61 / 32%);
@@ -174,77 +124,148 @@ main {
   margin: 0 auto;
 }
 
-.definition-controls {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem);
-  align-items: stretch;
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-.options-form {
-  min-width: 0;
-}
-
-.control-group {
-  min-width: 0;
-  height: 100%;
+.options-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.7rem;
   margin: 0;
-  padding: 0.65rem 1rem 1rem;
+  padding: 0.45rem 0 0.75rem;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+  scrollbar-width: thin;
+}
+
+.toolbar-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.toolbar-label {
+  display: block;
+  min-height: 1rem;
+  margin: 0 0 0.32rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.toolbar-load {
+  flex: 0 0 auto;
+}
+
+.option-panel {
+  min-width: 0;
+  flex: 0 0 auto;
+  padding: 0.55rem 0.7rem 0.65rem;
   border: 1px solid var(--line);
   border-radius: 0.75rem;
-  background: rgb(255 253 248 / 78%);
+  background: rgb(255 253 248 / 88%);
+  box-shadow: 0 6px 22px rgb(23 36 61 / 5%);
 }
 
-.control-group > legend {
-  padding: 0 0.35rem;
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 750;
+.option-panel__title {
+  margin: 0 0 0.45rem;
+  color: var(--accent-dark);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
-.definition-controls .puzzle-picker {
-  min-width: 0;
-}
-
-.options-panel {
+.option-panel__content,
+.word-selection {
   display: flex;
-  align-items: end;
-  gap: 1.25rem;
+  align-items: flex-end;
+  gap: 0.7rem;
 }
 
-.vote-option label,
-.type-options legend {
-  display: block;
-  margin-bottom: 0.45rem;
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 750;
+.option-panel--puzzle select {
+  width: 9rem;
 }
 
-.vote-option input {
-  width: 7rem;
-  min-height: 2.75rem;
-  padding: 0 0.7rem;
-  border: 1px solid var(--line);
+.toolbar-field--seed input {
+  width: 13rem;
+}
+
+.toolbar-field--votes input {
+  width: 5.3rem;
+}
+
+.attached-controls,
+.split-button {
+  display: flex;
+}
+
+.attached-controls {
+  gap: 0.5rem;
+}
+
+.attached-controls .button,
+.split-button .button {
+  position: relative;
+  white-space: nowrap;
+}
+
+.attached-controls .button {
   border-radius: 0.55rem;
-  color: var(--ink);
+}
+
+.split-button__main {
+  min-width: 4.5rem;
+  border-radius: 0.55rem 0 0 0.55rem;
+}
+
+.split-button__toggle {
+  width: 2.25rem;
+  margin-left: -1px;
+  padding-right: 0;
+  padding-left: 0;
+  border-radius: 0 0.55rem 0.55rem 0;
+}
+
+.saved-menu {
+  position: fixed;
+  z-index: 20;
+  display: grid;
+  max-height: min(24rem, calc(100vh - 2rem));
+  padding: 0.35rem;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
   background: var(--surface);
+  box-shadow: 0 16px 45px rgb(23 36 61 / 20%);
+}
+
+.saved-menu__item {
+  width: 100%;
+  padding: 0.62rem 0.7rem;
+  border: 0;
+  border-radius: 0.4rem;
+  color: var(--ink);
+  background: transparent;
+  font-size: 0.8rem;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.saved-menu__item:hover,
+.saved-menu__item:focus-visible {
+  outline: 0;
+  background: var(--sky);
 }
 
 .type-options {
   display: flex;
-  flex: 1;
-  flex-wrap: wrap;
-  gap: 0.65rem 1rem;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.type-options legend {
-  width: 100%;
-  padding: 0;
+  align-items: center;
+  gap: 0.8rem;
+  min-height: 2.55rem;
+  white-space: nowrap;
 }
 
 .type-options label {
@@ -262,28 +283,49 @@ main {
   accent-color: var(--accent);
 }
 
+.toolbar-actions {
+  display: grid;
+  width: 7.4rem;
+  flex: 0 0 auto;
+  align-self: stretch;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0.35rem;
+}
+
+.toolbar-actions .split-button,
+.toolbar-generate {
+  width: 100%;
+  height: 100%;
+}
+
+.toolbar-actions .button {
+  min-height: 0;
+}
+
+.toolbar-actions .split-button__main {
+  flex: 1;
+}
+
+[hidden] {
+  display: none !important;
+}
+
 .puzzle {
-  padding: 1.5rem 0 2rem;
+  padding: 0.85rem 0 2rem;
 }
 
 .puzzle__meta {
-  display: grid;
-  grid-template-columns: minmax(8rem, 1fr) minmax(10rem, 1fr) auto;
+  display: flex;
   align-items: end;
+  justify-content: space-between;
   gap: 1rem;
   margin-bottom: 0.7rem;
 }
 
-.seed,
 .progress {
   margin: 0.25rem 0 0;
   font-size: 1rem;
   font-weight: 750;
-}
-
-.seed {
-  overflow-wrap: anywhere;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 .puzzle__actions {
@@ -455,6 +497,7 @@ main {
 }
 
 .clue-list {
+  position: relative;
   display: grid;
   gap: 0.15rem;
   max-height: 22rem;
@@ -520,20 +563,6 @@ main {
   line-height: 1.45;
 }
 
-footer {
-  width: min(92rem, calc(100% - 3rem));
-  margin: 0 auto;
-  padding: 1.25rem 0 2.5rem;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 0.78rem;
-  line-height: 1.5;
-}
-
-footer p {
-  margin: 0;
-}
-
 .visually-hidden {
   position: absolute !important;
   width: 1px !important;
@@ -547,10 +576,6 @@ footer p {
 }
 
 @media (max-width: 58rem) {
-  .definition-controls {
-    grid-template-columns: 1fr;
-  }
-
   .game-layout {
     grid-template-columns: 1fr;
   }
@@ -569,40 +594,16 @@ footer p {
     --cell-size: clamp(1.95rem, calc((100vw - 3.5rem) / var(--columns, 10)), 2.6rem);
   }
 
-  .masthead,
-  main,
-  footer {
+  main {
     width: min(100% - 1.5rem, 92rem);
   }
 
-  .masthead {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 0.85rem;
-    padding-top: 0.8rem;
-  }
-
-  .puzzle-picker__row,
   .puzzle__actions {
     flex-wrap: wrap;
   }
 
-  .options-panel {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .vote-option input {
-    width: 100%;
-  }
-
   .puzzle__meta {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .puzzle__actions {
-    grid-column: 1 / -1;
+    align-items: flex-start;
   }
 
   .clues {
