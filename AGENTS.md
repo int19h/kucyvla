@@ -1,4 +1,3 @@
-## Herdr Collab
+## Working with other agent sessions
 
-The Herdr Collab project ID for this repository is exactly `crossword`.
-Coordinate through the `herdr-collab` skill and MCP tools; do not infer the project from the checkout path.
+To work with other agent sessions, follow the global instructions on this machine.
